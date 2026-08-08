@@ -4,15 +4,16 @@ Pure math testing with zero video/hardware dependencies.
 """
 
 import pytest
-from src.schema import Point, BoundingBox, TrackedPerson
+from src.domain.schema import Point, BoundingBox, TrackedPerson, QueueSnapshot
 from src.analytics.spatial import is_point_in_polygon, is_person_in_queue
-from src.analytics.queue_math import (
+from src.evaluation.metrics import (
     calculate_expected_wait_time,
     compute_queue_snapshot,
     calculate_mae,
     calculate_rmse,
     calculate_mape,
 )
+from src.evaluation.report import generate_evaluation_report
 
 
 @pytest.fixture
@@ -107,3 +108,116 @@ def test_evaluation_error_metrics():
     # MAPE = 100/3 * (|2/10| + |2/20| + |3/30|) = 100/3 * (0.2 + 0.1 + 0.1) = 13.33%
     mape = calculate_mape(actuals, preds)
     assert pytest.approx(mape, 0.01) == 13.33
+
+
+@pytest.mark.slow
+def test_pipeline_respects_sampling_fps():
+    """Pipeline should skip frames when sampling_fps < video fps."""
+    from pathlib import Path
+    from src.config import PipelineConfig, ROIConfig, VisionConfig, AnalyticsConfig
+    from src.pipeline.runner import run_pipeline
+
+    config = PipelineConfig(
+        vision=VisionConfig(model_path=Path("models/best.pt")),
+        roi=ROIConfig(
+            polygon_points=(
+                Point(0.05, 0.10),
+                Point(0.95, 0.10),
+                Point(0.95, 0.95),
+                Point(0.05, 0.95),
+            )
+        ),
+        video_source=Path("data/input_videos/short video sample/sample.mp4"),
+        output_dir=Path("data/output"),
+        analytics=AnalyticsConfig(sampling_fps=1.0),
+    )
+    snapshots = run_pipeline(config)
+    # sample.mp4 is ~5078938 bytes, roughly 169s at 30fps = ~5070 frames
+    # At 1.0 fps sampling, expect ~169 snapshots
+    assert len(snapshots) < 500
+
+
+def test_generate_evaluation_report():
+    """Report generator produces correct MAE/RMSE/MAPE/precision/recall/F1."""
+    service_rate_per_min = 3.0  # 3 patients per minute
+    # Ground truth: 3 frames where counts are [3, 0, 2]
+    ground_truth_counts = [3, 0, 2]
+    # Snapshot EWT = count / service_rate * 60 (seconds)
+    # predicted waits: 3/3*60=60, 0, 2/3*60=40
+    snapshots = [
+        QueueSnapshot(
+            timestamp=float(i),
+            frame_index=i,
+            in_queue_count=gc,
+            out_of_queue_count=0,
+            total_active_tracks=gc,
+            active_queue_ids=(1,),
+            avg_dwell_time_sec=0.0,
+            estimated_wait_time_sec=gc / service_rate_per_min * 60.0,
+        )
+        for i, gc in enumerate(ground_truth_counts)
+    ]
+
+    report = generate_evaluation_report(
+        snapshots, ground_truth_counts, service_rate_per_min
+    )
+
+    # Predicted counts match ground truth exactly → MAE/RMSE zero for waits,
+    # MAPE zero, and precision/recall/F1 = 1.0
+    assert report.mae == pytest.approx(0.0, abs=1e-9)
+    assert report.rmse == pytest.approx(0.0, abs=1e-9)
+    assert report.mape == pytest.approx(0.0, abs=1e-9)
+    assert report.precision == pytest.approx(1.0)
+    assert report.recall == pytest.approx(1.0)
+    assert report.f1_score == pytest.approx(1.0)
+
+
+def test_generate_evaluation_report_mismatch():
+    """A missed detection (predicted 0 vs truth 1) lowers recall but not precision."""
+    ground_truth_counts = [1, 1, 0]
+    snapshots = [
+        QueueSnapshot(
+            timestamp=float(i),
+            frame_index=i,
+            in_queue_count=pred,
+            out_of_queue_count=0,
+            total_active_tracks=pred,
+            active_queue_ids=(1,),
+            avg_dwell_time_sec=0.0,
+            estimated_wait_time_sec=0.0,
+        )
+        for i, pred in enumerate([1, 0, 0])  # missed the 2nd patient
+    ]
+
+    report = generate_evaluation_report(
+        snapshots, ground_truth_counts, service_rate_per_min=3.0
+    )
+
+    # One true positive, one false negative, one true negative
+    assert report.recall == pytest.approx(0.5)
+    assert report.precision == pytest.approx(1.0)
+    assert report.f1_score == pytest.approx(2 / 3, abs=1e-9)
+
+
+def test_generate_evaluation_report_length_mismatch():
+    snapshots = [QueueSnapshot(0.0, 0, 1, 0, 1, (1,), 0.0, 0.0) for _ in range(3)]
+    with pytest.raises(ValueError):
+        generate_evaluation_report(snapshots, [1, 1], 1.0)
+
+
+def test_generate_evaluation_report_save(tmp_path):
+    from pathlib import Path
+    from src.evaluation.report import save_evaluation_report
+
+    snapshots = [
+        QueueSnapshot(0.0, 0, 2, 0, 2, (1, 2), 10.0, 40.0),
+        QueueSnapshot(1.0, 1, 3, 0, 3, (1, 2, 3), 10.0, 60.0),
+    ]
+    report = generate_evaluation_report(snapshots, [2, 3], service_rate_per_min=3.0)
+    out = tmp_path / "report.json"
+    save_evaluation_report(report, out)
+    assert out.exists()
+    import json
+
+    data = json.loads(out.read_text())
+    assert data["precision"] == pytest.approx(1.0)

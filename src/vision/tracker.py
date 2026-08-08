@@ -8,8 +8,8 @@ import numpy as np
 import supervision as sv
 from trackers import ByteTrackTracker
 
-from src.schema import Point, BoundingBox, Detection, TrackedPerson
-from src.config import TrackerConfig
+from src.domain.schema import Point, BoundingBox, Detection, TrackedPerson
+from src.domain.config import TrackerConfig
 from src.analytics.spatial import is_person_in_queue
 
 
@@ -66,7 +66,11 @@ def update_tracks(
         for i in range(len(tracked_dets)):
             track_id = int(tracked_dets.tracker_id[i])
             xyxy = tracked_dets.xyxy[i]
-            conf = float(tracked_dets.confidence[i]) if tracked_dets.confidence is not None else 1.0
+            conf = (
+                float(tracked_dets.confidence[i])
+                if tracked_dets.confidence is not None
+                else 1.0
+            )
 
             bbox = BoundingBox(
                 x1=float(xyxy[0]),

@@ -1,11 +1,9 @@
-"""
-Queue Management via Surveillance Camera for Patient Flow package.
-Root re-exports for convenient top-level imports.
+"""Domain layer: core schemas, configuration, and exceptions.
+
+All immutable data structures and configuration types live here.
+No dependency on vision, analytics, or transport layers.
 """
 
-__version__ = "0.2.0"
-
-# Domain layer
 from src.domain.schema import (
     Point,
     BoundingBox,
@@ -23,7 +21,6 @@ from src.domain.config import (
 )
 
 __all__ = [
-    "__version__",
     # Schema
     "Point",
     "BoundingBox",

@@ -1,11 +1,14 @@
 """
-Main entrypoint for Queue Management via Surveillance Camera for Patient Flow.
+CLI entrypoint for Queue Management via Surveillance Camera for Patient Flow.
+
+Defines configuration inline, then delegates to the pipeline runner.
 """
 
 from pathlib import Path
-from src.config import PipelineConfig, ROIConfig, VisionConfig
-from src.schema import Point
-from src.pipeline import run_pipeline
+
+from src.domain.config import PipelineConfig, ROIConfig, VisionConfig, AnalyticsConfig
+from src.domain.schema import Point
+from src.pipeline.runner import run_pipeline
 
 
 def main():

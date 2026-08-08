@@ -1,15 +1,17 @@
 """
 Spatial and queue analytics package.
+
+Spatial functions remain in spatial.py; queue math has been extracted
+to src.evaluation/metrics.py but is re-exported here for backward compat.
 """
 
 from src.analytics.spatial import is_point_in_polygon, is_person_in_queue
-from src.analytics.queue_math import (
+from src.evaluation.metrics import (
     calculate_expected_wait_time,
     compute_queue_snapshot,
     calculate_mae,
     calculate_rmse,
     calculate_mape,
-    evaluate_predictions,
 )
 
 __all__ = [
@@ -20,5 +22,4 @@ __all__ = [
     "calculate_mae",
     "calculate_rmse",
     "calculate_mape",
-    "evaluate_predictions",
 ]

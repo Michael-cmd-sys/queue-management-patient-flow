@@ -4,7 +4,7 @@ Zero external dependencies beyond core python and schema definitions.
 """
 
 from typing import Sequence
-from src.schema import Point, BoundingBox, TrackedPerson
+from src.domain.schema import Point, BoundingBox, TrackedPerson
 
 
 def is_point_in_polygon(point: Point, polygon: Sequence[Point]) -> bool:

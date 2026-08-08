@@ -6,8 +6,8 @@ Transforms raw frame arrays into immutable Detection data contracts.
 from typing import Tuple, Any
 import numpy as np
 
-from src.schema import BoundingBox, Detection
-from src.config import VisionConfig
+from src.domain.schema import BoundingBox, Detection
+from src.domain.config import VisionConfig
 
 
 def load_yolo_model(config: VisionConfig) -> Any:
@@ -16,10 +16,12 @@ def load_yolo_model(config: VisionConfig) -> Any:
     Side-effecting model loader isolated at vision boundary.
     """
     from ultralytics import YOLO
-    
+
     if not config.model_path.exists():
-        raise FileNotFoundError(f"Model weight file not found at {config.model_path.resolve()}")
-    
+        raise FileNotFoundError(
+            f"Model weight file not found at {config.model_path.resolve()}"
+        )
+
     model = YOLO(str(config.model_path))
     return model
 
@@ -65,7 +67,7 @@ def detect_frame_objects(
         xyxy = box.xyxy[0].cpu().numpy()
         conf = float(box.conf[0].cpu().numpy())
         cls_id = int(box.cls[0].cpu().numpy())
-        
+
         name = result.names.get(cls_id, "person")
 
         bbox = BoundingBox(
