@@ -1,29 +1,30 @@
 """
-Multi-object tracking wrapper using ByteTrack via supervision.
+Multi-object tracking wrapper using ByteTrackTracker via the trackers library.
 Transforms detections into persistent TrackedPerson instances over time.
 """
 
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict
 import numpy as np
 import supervision as sv
+from trackers import ByteTrackTracker
 
 from src.schema import Point, BoundingBox, Detection, TrackedPerson
 from src.config import TrackerConfig
 from src.analytics.spatial import is_person_in_queue
 
 
-def create_tracker(config: TrackerConfig) -> sv.ByteTrack:
-    """Initialize ByteTrack instance."""
-    return sv.ByteTrack(
+def create_tracker(config: TrackerConfig) -> ByteTrackTracker:
+    """Initialize ByteTrackTracker instance using the modern trackers library."""
+    return ByteTrackTracker(
         track_activation_threshold=config.track_thresh,
         lost_track_buffer=config.track_buffer,
-        minimum_matching_threshold=config.match_thresh,
+        minimum_iou_threshold=config.match_thresh,
         frame_rate=config.frame_rate,
     )
 
 
 def update_tracks(
-    tracker: sv.ByteTrack,
+    tracker: ByteTrackTracker,
     detections: Tuple[Detection, ...],
     timestamp: float,
     queue_polygon: Tuple[Point, ...],
@@ -33,17 +34,16 @@ def update_tracks(
     Update tracker with current frame detections.
 
     Args:
-        tracker: ByteTrack instance.
+        tracker: ByteTrackTracker instance.
         detections: Tuple of Detection objects from current frame.
         timestamp: Current frame timestamp in seconds.
-        queue_polygon: Polygon defining the queue boundary.
-        track_history: Mutable mapping of track_id to initial timestamp (updated side-effecting state).
+        queue_polygon: Polygon defining the queue boundary in pixel coordinates.
+        track_history: Mapping of track_id to initial timestamp.
 
     Returns:
         Tuple of updated TrackedPerson objects, and updated track_history dictionary.
     """
     if not detections:
-        # Convert empty detections
         sv_dets = sv.Detections.empty()
     else:
         xyxy_list = [[d.box.x1, d.box.y1, d.box.x2, d.box.y2] for d in detections]
@@ -56,8 +56,8 @@ def update_tracks(
             class_id=np.array(cls_list, dtype=int),
         )
 
-    # Track detections
-    tracked_dets = tracker.update_with_detections(sv_dets)
+    # Modern trackers update API
+    tracked_dets = tracker.update(sv_dets)
 
     tracked_persons = []
     updated_history = dict(track_history)

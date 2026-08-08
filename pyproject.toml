@@ -13,5 +13,6 @@ dependencies = [
     "pytest>=9.1.1",
     "scipy>=1.18.0",
     "supervision>=0.30.0",
+    "trackers>=2.6.0",
     "ultralytics>=8.4.116",
 ]
