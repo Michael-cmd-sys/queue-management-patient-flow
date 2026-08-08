@@ -10,6 +10,7 @@ env/
 data/input_videos/*.mp4
 data/input_videos/*.avi
 data/input_videos/*.mov
+data/output/
 models/*.pt
 models/*.onnx
 models/*.engine
