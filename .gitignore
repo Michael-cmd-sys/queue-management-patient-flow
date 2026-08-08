@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Data & Models (ignore large video/weight binaries)
+data/input_videos/*.mp4
+data/input_videos/*.avi
+data/input_videos/*.mov
+models/*.pt
+models/*.onnx
+models/*.engine
+models/*.weights
+
+# IDE & OS
+.DS_Store
+.vscode/
+.idea/
