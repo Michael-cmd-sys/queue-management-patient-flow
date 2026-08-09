@@ -67,6 +67,8 @@ Evaluated across $M$ temporal evaluation windows (e.g. 5-minute sampling interva
 
 $$\text{MAPE} = \frac{100\%}{M} \sum_{m=1}^{M} \left| \frac{N_{\text{actual}}(t_m) - N_{\text{pred}}(t_m)}{N_{\text{actual}}(t_m)} \right|$$
 
+> **Note:** Windows where $N_{\text{actual}}(t_m) = 0$ are excluded from the MAPE computation (the denominator is undefined for zero ground-truth counts). Only non-zero windows contribute to the summation.
+
 ### Dimension 2: Waiting Time Prediction Error (MAE & RMSE)
 Comparing actual duration spent in queue $T_{\text{actual}, k}$ vs. predicted wait time $\text{EWT}_k$ across a sample size of $K$ patients:
 
