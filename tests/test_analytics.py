@@ -4,8 +4,12 @@ Pure math testing with zero video/hardware dependencies.
 """
 
 import pytest
-from src.domain.schema import Point, BoundingBox, TrackedPerson, QueueSnapshot
-from src.analytics.spatial import is_point_in_polygon, is_person_in_queue
+from src.domain.schema import Point, BoundingBox, TrackedPerson, QueueSnapshot, Zone
+from src.analytics.spatial import (
+    is_point_in_polygon,
+    is_person_in_queue,
+    is_person_in_zones,
+)
 from src.evaluation.metrics import (
     calculate_expected_wait_time,
     compute_queue_snapshot,
@@ -45,6 +49,157 @@ def test_person_in_queue_feet_level(square_polygon):
     # Person standing outside
     box_outside = BoundingBox(x1=1.2, y1=0.2, x2=1.4, y2=0.8)
     assert is_person_in_queue(box_outside.bottom_center, square_polygon) is False
+
+
+@pytest.fixture
+def two_zones():
+    """Two overlapping unit-square zones with distinct IDs."""
+    return (
+        Zone(
+            id="zone_a",
+            label="Area A",
+            points=(
+                Point(0.0, 0.0),
+                Point(1.0, 0.0),
+                Point(1.0, 1.0),
+                Point(0.0, 1.0),
+            ),
+        ),
+        Zone(
+            id="zone_b",
+            label="Area B",
+            points=(
+                Point(0.5, 0.5),
+                Point(2.0, 0.5),
+                Point(2.0, 2.0),
+                Point(0.5, 2.0),
+            ),
+        ),
+    )
+
+
+def test_is_person_in_zones_multi_zone(two_zones):
+    # Point in zone_a only (top-left of square, outside overlapping region)
+    assert is_person_in_zones(Point(0.2, 0.2), two_zones) == ("zone_a",)
+
+    # Point in overlapping region (both zones)
+    assert is_person_in_zones(Point(0.7, 0.7), two_zones) == ("zone_a", "zone_b")
+
+    # Point in zone_b only
+    assert is_person_in_zones(Point(1.5, 1.5), two_zones) == ("zone_b",)
+
+    # Point outside both zones
+    assert is_person_in_zones(Point(3.0, 3.0), two_zones) == ()
+
+
+def test_compute_queue_snapshot_multi_zone(two_zones):
+    p1 = TrackedPerson(
+        track_id=1,
+        box=BoundingBox(0.1, 0.1, 0.3, 0.5),
+        centroid=Point(0.2, 0.3),
+        bottom_point=Point(0.2, 0.5),  # inside zone_a only
+        confidence=0.9,
+        first_seen_timestamp=0.0,
+        last_seen_timestamp=10.0,
+        is_in_queue=True,
+        in_zone_ids=("zone_a",),
+    )
+    p2 = TrackedPerson(
+        track_id=2,
+        box=BoundingBox(0.6, 0.6, 0.8, 0.9),
+        centroid=Point(0.7, 0.75),
+        bottom_point=Point(0.7, 0.9),  # inside both zones
+        confidence=0.85,
+        first_seen_timestamp=2.0,
+        last_seen_timestamp=8.0,
+        is_in_queue=True,
+        in_zone_ids=("zone_a", "zone_b"),
+    )
+    p3 = TrackedPerson(
+        track_id=3,
+        box=BoundingBox(1.5, 1.5, 1.7, 1.9),
+        centroid=Point(1.6, 1.7),
+        bottom_point=Point(1.6, 1.9),  # inside zone_b only
+        confidence=0.8,
+        first_seen_timestamp=1.0,
+        last_seen_timestamp=9.0,
+        is_in_queue=True,
+        in_zone_ids=("zone_b",),
+    )
+
+    snapshot = compute_queue_snapshot(
+        frame_index=0,
+        timestamp=0.0,
+        tracks=[p1, p2, p3],
+        zones=two_zones,
+        service_rate_per_min=1.0,
+    )
+
+    assert snapshot.in_queue_count == 3
+    assert snapshot.zone_counts["zone_a"] == 2  # p1 + p2
+    assert snapshot.zone_counts["zone_b"] == 2  # p2 + p3
+
+
+def test_compute_queue_snapshot_single_zone_backward_compat():
+    """Single-zone list of length 1 preserves old behaviour; zone_counts empty."""
+    single_zone = (
+        Zone(
+            id="main",
+            label="Main",
+            points=(
+                Point(0.0, 0.0),
+                Point(1.0, 0.0),
+                Point(1.0, 1.0),
+                Point(0.0, 1.0),
+            ),
+        ),
+    )
+    p = TrackedPerson(
+        track_id=1,
+        box=BoundingBox(0.2, 0.2, 0.4, 0.8),
+        centroid=Point(0.3, 0.5),
+        bottom_point=Point(0.3, 0.8),
+        confidence=0.9,
+        first_seen_timestamp=0.0,
+        last_seen_timestamp=10.0,
+        is_in_queue=True,
+        in_zone_ids=("main",),
+    )
+
+    snapshot = compute_queue_snapshot(
+        frame_index=0,
+        timestamp=0.0,
+        tracks=[p],
+        zones=single_zone,
+        service_rate_per_min=1.0,
+    )
+
+    assert snapshot.in_queue_count == 1
+    assert snapshot.zone_counts == {"main": 1}
+
+
+def test_compute_queue_snapshot_no_zones_backward_compat():
+    """Without zones argument, behaves exactly like the old API (zone_counts empty)."""
+    p = TrackedPerson(
+        track_id=1,
+        box=BoundingBox(0.2, 0.2, 0.4, 0.8),
+        centroid=Point(0.3, 0.5),
+        bottom_point=Point(0.3, 0.8),
+        confidence=0.9,
+        first_seen_timestamp=0.0,
+        last_seen_timestamp=10.0,
+        is_in_queue=True,
+    )
+
+    snapshot = compute_queue_snapshot(
+        frame_index=0,
+        timestamp=0.0,
+        tracks=[p],
+        service_rate_per_min=1.0,
+    )
+
+    assert snapshot.in_queue_count == 1
+    assert snapshot.zone_counts == {}
 
 
 def test_expected_wait_time():
@@ -114,17 +269,28 @@ def test_evaluation_error_metrics():
 def test_pipeline_respects_sampling_fps():
     """Pipeline should skip frames when sampling_fps < video fps."""
     from pathlib import Path
-    from src.config import PipelineConfig, ROIConfig, VisionConfig, AnalyticsConfig
+    from src.domain.config import (
+        PipelineConfig,
+        ROIConfig,
+        VisionConfig,
+        AnalyticsConfig,
+    )
     from src.pipeline.runner import run_pipeline
 
     config = PipelineConfig(
         vision=VisionConfig(model_path=Path("models/best.pt")),
         roi=ROIConfig(
-            polygon_points=(
-                Point(0.05, 0.10),
-                Point(0.95, 0.10),
-                Point(0.95, 0.95),
-                Point(0.05, 0.95),
+            zones=(
+                Zone(
+                    id="main",
+                    label="Patient Triage Queue Line",
+                    points=(
+                        Point(0.05, 0.10),
+                        Point(0.95, 0.10),
+                        Point(0.95, 0.95),
+                        Point(0.05, 0.95),
+                    ),
+                ),
             )
         ),
         video_source=Path("data/input_videos/short video sample/sample.mp4"),

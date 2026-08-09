@@ -5,23 +5,23 @@ These functions have no I/O side effects — they transform inputs into outputs.
 The runner.py module handles video capture, file I/O, and lifecycle management.
 """
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Sequence
 
 import cv2
 import numpy as np
 
-from src.domain.schema import Detection, Point, QueueSnapshot, TrackedPerson
+from src.domain.schema import Detection, Point, QueueSnapshot, TrackedPerson, Zone
 from src.domain.config import PipelineConfig, ROIConfig, AnalyticsConfig
 from src.vision.detector import detect_frame_objects
 from src.vision.tracker import update_tracks
-from src.analytics.queue_math import compute_queue_snapshot
+from src.evaluation.metrics import compute_queue_snapshot
 
 
 def process_frame(
     frame: np.ndarray,
     model: object,
     config: PipelineConfig,
-    polygon_points: Tuple[Point, ...],
+    zones: Sequence[Zone],
     frame_idx: int,
     fps: float,
     track_history: Dict[int, float],
@@ -36,7 +36,8 @@ def process_frame(
         frame: OpenCV BGR image frame array.
         model: Loaded YOLO model instance.
         config: PipelineConfig with vision/threshold parameters.
-        polygon_points: Queue ROI polygon points (already in pixel coordinates).
+        zones: Sequence of Zone definitions (id, label, pixel-coordinate points)
+            defining the queue boundary regions.
         frame_idx: Zero-based frame index.
         fps: Video frames-per-second.
         track_history: Mutable tracking dict (track_id -> first_seen_timestamp).
@@ -58,7 +59,7 @@ def process_frame(
         tracker=config.tracker,  # Note: caller resolves the tracker instance
         detections=detections,
         timestamp=timestamp,
-        queue_polygon=polygon_points,
+        zones=zones,
         track_history=track_history,
     )
 
@@ -67,6 +68,7 @@ def process_frame(
         frame_index=frame_idx,
         timestamp=timestamp,
         tracks=tracks,
+        zones=zones,
         service_rate_per_min=config.analytics.service_rate_per_min,
     )
 
@@ -77,7 +79,7 @@ def advance_tracker_state(
     tracker: object,
     detections: Tuple[Detection, ...],
     timestamp: float,
-    queue_polygon: Tuple[Point, ...],
+    zones: Sequence[Zone],
     track_history: Dict[int, float],
 ) -> Tuple[Tuple[TrackedPerson, ...], Dict[int, float]]:
     """
@@ -88,7 +90,7 @@ def advance_tracker_state(
         tracker: ByteTrackTracker instance (resolved by caller).
         detections: Tuple of Detection objects from current frame.
         timestamp: Current frame timestamp in seconds.
-        queue_polygon: Polygon defining queue boundary in pixel coordinates.
+        zones: Sequence of Zone definitions defining queue boundary in pixel coordinates.
         track_history: Mapping of track_id to initial timestamp.
 
     Returns:
@@ -98,6 +100,6 @@ def advance_tracker_state(
         tracker=tracker,
         detections=detections,
         timestamp=timestamp,
-        queue_polygon=queue_polygon,
+        zones=zones,
         track_history=track_history,
     )
