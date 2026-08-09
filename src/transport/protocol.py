@@ -56,7 +56,7 @@ class RPCEvent(BaseModel):
 class ZoneDTO(BaseModel):
     """A named queue zone definition for the set_queue_zones procedure."""
 
-    id: str = Field(default="main", description="Unique zone identifier")
+    id: str = Field(..., description="Unique zone identifier")
     label: str = Field(
         default="Main Queue Zone", description="Human-readable zone name"
     )
