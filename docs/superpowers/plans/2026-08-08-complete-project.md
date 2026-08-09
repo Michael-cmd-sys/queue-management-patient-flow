@@ -41,7 +41,7 @@ def test_pipeline_respects_sampling_fps():
     assert len(snapshots) < 500
 ```
 
-- [x] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to confirm it fails**
 
 Run: `pytest tests/test_analytics.py::test_pipeline_respects_sampling_fps -v`
 Expected: FAIL with assertion error (too many snapshots, or no sampling logic)
