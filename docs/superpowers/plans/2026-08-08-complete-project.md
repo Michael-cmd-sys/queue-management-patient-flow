@@ -14,7 +14,7 @@
 ### Task 1: Implement Frame Sampling in Pipeline
 
 **Files:**
-- Modify: `src/pipeline.py:1-205`
+- Modify: `src/pipeline/runner.py`
 - Modify: `src/config.py:44-49`
 
 - [ ] **Step 1: Write failing test for frame sampling**
@@ -65,7 +65,7 @@ class AnalyticsConfig:
         # frame_step computed dynamically based on video fps
 ```
 
-Modify `src/pipeline.py:111` — compute `frame_step` and skip frames:
+Modify `src/pipeline/runner.py` — compute `frame_step` and skip frames:
 
 ```python
 fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
@@ -88,7 +88,7 @@ Expected: PASS with ~169 snapshots
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/config.py src/pipeline.py tests/test_analytics.py
+git add src/config.py src/pipeline/ tests/test_analytics.py
 git commit -m "feat: add frame sampling to pipeline based on sampling_fps config"
 ```
 

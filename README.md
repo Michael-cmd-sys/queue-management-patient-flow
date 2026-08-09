@@ -104,7 +104,7 @@ queue-management-patient-flow/
 │   │   └── queue_math.py                # Pure EWT math, MAE, RMSE, and MAPE metrics
 │   ├── evaluation/
 │   │   └── plot_metrics.py              # Time-series analytics visualization generator
-│   └── pipeline.py                      # Pure pipeline orchestrator
+│   └── pipeline/                       # Pipeline package: runner, core, overlay, export
 ├── tests/
 │   └── test_analytics.py                # Pytest unit tests for spatial & mathematical routines
 ├── main.py                              # Entrypoint execution script
