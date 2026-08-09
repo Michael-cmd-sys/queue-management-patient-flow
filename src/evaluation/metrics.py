@@ -99,9 +99,10 @@ def calculate_mape(actuals: Sequence[float], predictions: Sequence[float]) -> fl
 
     MAPE = 100/n * sum(|actual - pred| / actual).
 
-    Windows where ``actual == 0`` are excluded from both the numerator and
-    denominator (division by zero is undefined). The returned value is scaled
-    to 100× the fractional error (i.e. a percentage).
+    Windows where ``actual <= 0`` are excluded from both the numerator and
+    denominator (division by zero is undefined, and negative actual values are
+    not meaningful for percentage error). The returned value is scaled to 100×
+    the fractional error (i.e. a percentage).
     """
     if not actuals or len(actuals) != len(predictions):
         return 0.0
