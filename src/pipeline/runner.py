@@ -7,22 +7,20 @@ to pipeline.core.process_frame (pure logic) and visualization to
 pipeline.overlay.draw_pipeline_overlay.
 """
 
-import json
-from pathlib import Path
-from typing import List, Dict, Tuple
+from collections.abc import Sequence
+
 import cv2
 
-from src.domain.schema import Point, QueueSnapshot, TrackedPerson
 from src.domain.config import PipelineConfig, ROIConfig
-from src.vision.detector import load_yolo_model, detect_frame_objects
-from src.vision.tracker import create_tracker, update_tracks
-from src.analytics.queue_math import compute_queue_snapshot
-from src.pipeline.core import process_frame
-from src.pipeline.overlay import draw_pipeline_overlay
+from src.domain.schema import Point, QueueSnapshot, TrackedPerson, Zone
+from src.evaluation.metrics import compute_queue_snapshot
 from src.pipeline.export import export_metrics_json
+from src.pipeline.overlay import draw_pipeline_overlay
+from src.vision.detector import detect_frame_objects, load_yolo_model
+from src.vision.tracker import create_tracker, update_tracks
 
 
-def run_pipeline(config: PipelineConfig) -> List[QueueSnapshot]:
+def run_pipeline(config: PipelineConfig) -> list[QueueSnapshot]:
     """
     Run complete video processing, tracking, and analytics pipeline.
 
@@ -75,11 +73,13 @@ def run_pipeline(config: PipelineConfig) -> List[QueueSnapshot]:
         str(annotated_video_path), fourcc, fps, (width, height)
     )
 
-    snapshots: List[QueueSnapshot] = []
-    track_history: Dict[int, float] = {}
+    snapshots: list[QueueSnapshot] = []
+    track_history: dict[int, float] = {}
 
     frame_idx = 0
-    polygon_points = config.roi.polygon_points
+    # Convert ROI zone points (if normalized 0..1) to pixel coordinates
+    pixel_zones = _zones_to_pixel(config.roi.zones, width, height)
+    config_roi = ROIConfig(zones=pixel_zones)
     last_annotated_frame = None
 
     while True:
@@ -99,22 +99,13 @@ def run_pipeline(config: PipelineConfig) -> List[QueueSnapshot]:
             frame_idx += 1
             continue
 
-        # Convert ROI polygon points (if normalized 0..1) to pixel coordinates
-        poly_pixel_pts = tuple(
-            Point(
-                x=pt.x * width if pt.x <= 1.0 else pt.x,
-                y=pt.y * height if pt.y <= 1.0 else pt.y,
-            )
-            for pt in polygon_points
-        )
-
         # Process frame: detect → track → compute snapshot
         tracks, snapshot, track_history = _process_frame_with_tracker(
             frame=frame,
             model=model,
             tracker=tracker,
             config=config,
-            poly_pixel_pts=poly_pixel_pts,
+            pixel_zones=pixel_zones,
             frame_idx=frame_idx,
             fps=fps,
             track_history=track_history,
@@ -127,7 +118,7 @@ def run_pipeline(config: PipelineConfig) -> List[QueueSnapshot]:
             frame=frame,
             tracks=tracks,
             snapshot=snapshot,
-            roi_config=ROIConfig(polygon_points=polygon_points),
+            roi_config=config_roi,
             frame_width=width,
             frame_height=height,
         )
@@ -154,16 +145,41 @@ def run_pipeline(config: PipelineConfig) -> List[QueueSnapshot]:
     return snapshots
 
 
+def _zones_to_pixel(zones: Sequence[Zone], width: int, height: int) -> tuple[Zone, ...]:
+    """Convert zone points to pixel coordinates.
+
+    Uses the explicit ``coordinate_space`` of each zone rather than inferring it
+    per-coordinate: ``"pixel"`` zones are passed through unchanged, while
+    ``"normalized"`` zones (the default) are scaled by frame dimensions.  This
+    removes the ambiguity of a coordinate value exactly equal to 1.0.
+    """
+    pixel_zones = []
+    for zone in zones:
+        if zone.coordinate_space == "pixel":
+            pts = tuple(Point(x=p.x, y=p.y) for p in zone.points)
+        else:
+            pts = tuple(Point(x=p.x * width, y=p.y * height) for p in zone.points)
+        pixel_zones.append(
+            Zone(
+                id=zone.id,
+                label=zone.label,
+                points=pts,
+                coordinate_space=zone.coordinate_space,
+            )
+        )
+    return tuple(pixel_zones)
+
+
 def _process_frame_with_tracker(
     frame,
     model,
     tracker,
     config: PipelineConfig,
-    poly_pixel_pts: Tuple[Point, ...],
+    pixel_zones: tuple[Zone, ...],
     frame_idx: int,
     fps: float,
-    track_history: Dict[int, float],
-) -> Tuple[Tuple[TrackedPerson, ...], QueueSnapshot, Dict[int, float]]:
+    track_history: dict[int, float],
+) -> tuple[tuple[TrackedPerson, ...], QueueSnapshot, dict[int, float]]:
     """Internal: process a frame using already-loaded model and tracker."""
     timestamp = frame_idx / fps
 
@@ -175,7 +191,7 @@ def _process_frame_with_tracker(
         tracker=tracker,
         detections=detections,
         timestamp=timestamp,
-        queue_polygon=poly_pixel_pts,
+        zones=pixel_zones,
         track_history=track_history,
     )
 
@@ -184,6 +200,7 @@ def _process_frame_with_tracker(
         frame_index=frame_idx,
         timestamp=timestamp,
         tracks=tracks,
+        zones=pixel_zones,
         service_rate_per_min=config.analytics.service_rate_per_min,
     )
 

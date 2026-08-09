@@ -67,6 +67,8 @@ Evaluated across $M$ temporal evaluation windows (e.g. 5-minute sampling interva
 
 $$\text{MAPE} = \frac{100\%}{M} \sum_{m=1}^{M} \left| \frac{N_{\text{actual}}(t_m) - N_{\text{pred}}(t_m)}{N_{\text{actual}}(t_m)} \right|$$
 
+> **Note:** Windows where $N_{\text{actual}}(t_m) = 0$ are excluded from the MAPE computation (the denominator is undefined for zero ground-truth counts). Only non-zero windows contribute to the summation.
+
 ### Dimension 2: Waiting Time Prediction Error (MAE & RMSE)
 Comparing actual duration spent in queue $T_{\text{actual}, k}$ vs. predicted wait time $\text{EWT}_k$ across a sample size of $K$ patients:
 
@@ -104,7 +106,7 @@ queue-management-patient-flow/
 │   │   └── queue_math.py                # Pure EWT math, MAE, RMSE, and MAPE metrics
 │   ├── evaluation/
 │   │   └── plot_metrics.py              # Time-series analytics visualization generator
-│   └── pipeline.py                      # Pure pipeline orchestrator
+│   └── pipeline/                       # Pipeline package: runner, core, overlay, export
 ├── tests/
 │   └── test_analytics.py                # Pytest unit tests for spatial & mathematical routines
 ├── main.py                              # Entrypoint execution script
@@ -118,6 +120,7 @@ queue-management-patient-flow/
 ### Prerequisites
 * Python $\ge 3.13$
 * [`uv`](https://github.com/astral-sh/uv) fast package manager
+* `models/best.pt` — Custom fine-tuned YOLOv8 weights **not committed to git** (see `.gitignore`). Download from the [release assets](https://github.com/Michael-cmd-sys/queue-management-patient-flow/releases) or train a custom model per the thesis data, then place at `models/best.pt` before running.
 
 ### 1. Installation & Environment Setup
 ```bash

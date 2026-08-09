@@ -7,7 +7,7 @@ Defines configuration inline, then delegates to the pipeline runner.
 from pathlib import Path
 
 from src.domain.config import PipelineConfig, ROIConfig, VisionConfig, AnalyticsConfig
-from src.domain.schema import Point
+from src.domain.schema import Point, Zone
 from src.pipeline.runner import run_pipeline
 
 
@@ -17,14 +17,19 @@ def main():
     print(" KNUST Mathematics Thesis Implementation Pipeline ")
     print("=" * 60)
 
-    # Define custom ROI queue polygon tailored for sample video
+    # Define custom ROI queue zone tailored for sample video
     custom_roi = ROIConfig(
-        zone_name="Patient Triage Queue Line",
-        polygon_points=(
-            Point(0.05, 0.10),
-            Point(0.95, 0.10),
-            Point(0.95, 0.95),
-            Point(0.05, 0.95),
+        zones=(
+            Zone(
+                id="main",
+                label="Patient Triage Queue Line",
+                points=(
+                    Point(0.05, 0.10),
+                    Point(0.95, 0.10),
+                    Point(0.95, 0.95),
+                    Point(0.05, 0.95),
+                ),
+            ),
         ),
     )
 

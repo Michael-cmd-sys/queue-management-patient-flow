@@ -68,6 +68,10 @@ The system is designed as a **decoupled, real-time, event-driven computer vision
 * **`/api/video_feed`** (backend, implemented): annotated MJPEG multipart stream from `generate_video_mjpeg()`.
 * **Frontend (planned)**: an OctaneJS + Vite dashboard with `src/components/QueueTelemetry` reactive gauges for patient count, dwell time, and EWT. Not present in the current module tree.
 
+#### Layer 4: Interactive Dashboard Frontend (`dashboard/`)
+* **`src/components/QueueTelemetry`**: Fine-grained reactive gauges displaying patient count, dwell time, and EWT.
+* **Video stream**: `/api/video_feed` — annotated MJPEG multipart stream from `generate_video_mjpeg()`.
+
 #### Layer 5: Pipeline Orchestration (`src/pipeline/`)
 * **`runner.py`**: I/O orchestration (video capture, frame sampling, model loading, annotated video output, metrics export).
 * **`core.py`**: Pure per-frame processing (detect → track → snapshot).
