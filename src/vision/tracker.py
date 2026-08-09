@@ -5,7 +5,6 @@ Transforms detections into persistent TrackedPerson instances over time.
 
 from typing import Tuple, Dict
 import numpy as np
-import supervision as sv
 from trackers import ByteTrackTracker
 
 from src.domain.schema import Point, BoundingBox, Detection, TrackedPerson
@@ -43,6 +42,8 @@ def update_tracks(
     Returns:
         Tuple of updated TrackedPerson objects, and updated track_history dictionary.
     """
+    import supervision as sv
+
     if not detections:
         sv_dets = sv.Detections.empty()
     else:
