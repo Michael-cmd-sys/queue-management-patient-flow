@@ -9,9 +9,9 @@ and deterministic.
 import pytest
 from starlette.testclient import TestClient
 
-# Import via backward-compatible re-export — tests verify the public API path
-from src.rpc.server import app, state, route_rpc_request
-from src.rpc.protocol import RPCRequest, RPCResponse
+# Import from the canonical transport layer
+from src.transport.server import app, state, route_rpc_request
+from src.transport.protocol import RPCRequest, RPCResponse
 from src.domain.schema import Point, QueueSnapshot
 
 
