@@ -49,7 +49,7 @@ The system is designed as a **decoupled, real-time, event-driven computer vision
   - Expected Wait Time $\text{EWT}(t) = \frac{N(t)}{\mu}$
   - Statistical error metrics: MAE, RMSE, MAPE.
 
-#### Layer 3: WebSocket-RPC Gateway (`src/rpc/`)
+#### Layer 3: WebSocket-RPC Gateway (`src/transport/`)
 * **`protocol.py`**: Strongly-typed JSON-RPC 2.0 protocol specifications (`RPCRequest`, `RPCResponse`, `RPCEvent`).
 * **`server.py`**: FastAPI WebSocket endpoint exposing procedures:
   - `rpc.set_queue_zone(points)`: Dynamically updates active ROI polygon.
