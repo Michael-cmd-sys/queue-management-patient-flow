@@ -13,6 +13,7 @@ from src.domain.schema import (
     TrackedPerson,
     QueueSnapshot,
     EvaluationReport,
+    Zone,
 )
 from src.domain.config import (
     VisionConfig,
@@ -31,6 +32,7 @@ __all__ = [
     "TrackedPerson",
     "QueueSnapshot",
     "EvaluationReport",
+    "Zone",
     # Config
     "VisionConfig",
     "TrackerConfig",
