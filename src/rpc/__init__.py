@@ -11,7 +11,10 @@ from src.transport.protocol import (
     RPCResponse,
     RPCError,
     RPCEvent,
+    ZoneDTO,
+    SetQueueZonesParams,
     SetQueueZoneParams,
+    QueueMetricsPayload,
 )
 from src.transport.server import app
 
@@ -21,6 +24,9 @@ __all__ = [
     "RPCResponse",
     "RPCError",
     "RPCEvent",
+    "ZoneDTO",
+    "SetQueueZonesParams",
     "SetQueueZoneParams",
+    "QueueMetricsPayload",
     "app",
 ]

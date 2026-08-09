@@ -5,8 +5,8 @@ All hyperparameters and file paths are centralized and deterministic.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Tuple
-from src.domain.schema import Point
+from typing import Tuple
+from src.domain.schema import Point, Zone
 
 
 @dataclass(frozen=True)
@@ -32,16 +32,30 @@ class TrackerConfig:
 
 @dataclass(frozen=True)
 class ROIConfig:
-    """Region of Interest (Polygon) definition for queue boundary."""
+    """Region of Interest (named zones) definition for queue boundary."""
 
-    zone_name: str = "Main Patient Queue Zone"
-    # Polygon vertices (x, y) normalized (0.0 - 1.0) or pixel coordinates
-    polygon_points: Tuple[Point, ...] = (
-        Point(0.1, 0.2),
-        Point(0.9, 0.2),
-        Point(0.9, 0.9),
-        Point(0.1, 0.9),
+    zones: Tuple[Zone, ...] = (
+        Zone(
+            id="main",
+            label="Main Patient Queue Zone",
+            points=(
+                Point(0.1, 0.2),
+                Point(0.9, 0.2),
+                Point(0.9, 0.9),
+                Point(0.1, 0.9),
+            ),
+        ),
     )
+
+    @property
+    def zone_name(self) -> str:
+        """Backward-compatible access to the first zone's label."""
+        return self.zones[0].label if self.zones else "Main Patient Queue Zone"
+
+    @property
+    def polygon_points(self) -> Tuple[Point, ...]:
+        """Backward-compatible access to the first zone's points."""
+        return self.zones[0].points if self.zones else ()
 
 
 @dataclass(frozen=True)

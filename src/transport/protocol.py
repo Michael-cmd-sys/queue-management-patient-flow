@@ -19,7 +19,7 @@ class RPCRequest(BaseModel):
 
     jsonrpc: str = Field(default="2.0", description="Protocol version")
     id: Union[int, str] = Field(..., description="Request identifier")
-    method: str = Field(..., description="RPC method name (e.g. 'set_queue_zone')")
+    method: str = Field(..., description="RPC method name (e.g. 'set_queue_zones')")
     params: Optional[Dict[str, Any]] = Field(
         default=None, description="Procedure arguments"
     )
@@ -53,8 +53,28 @@ class RPCEvent(BaseModel):
     data: Dict[str, Any] = Field(..., description="Event payload")
 
 
+class ZoneDTO(BaseModel):
+    """A named queue zone definition for the set_queue_zones procedure."""
+
+    id: str = Field(default="main", description="Unique zone identifier")
+    label: str = Field(
+        default="Main Queue Zone", description="Human-readable zone name"
+    )
+    polygon_points: List[PointDTO] = Field(
+        ..., min_length=3, description="List of at least 3 polygon points"
+    )
+
+
+class SetQueueZonesParams(BaseModel):
+    """Parameters for 'set_queue_zones' procedure — accepts multiple named zones."""
+
+    zones: List[ZoneDTO] = Field(
+        ..., min_length=1, description="List of at least 1 zone definition"
+    )
+
+
 class SetQueueZoneParams(BaseModel):
-    """Parameters for 'set_queue_zone' procedure."""
+    """Backward-compatible single-zone parameters (deprecated; use SetQueueZonesParams)."""
 
     zone_name: str = Field(default="Main Queue Area")
     polygon_points: List[PointDTO] = Field(

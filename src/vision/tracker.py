@@ -3,14 +3,13 @@ Multi-object tracking wrapper using ByteTrackTracker via the trackers library.
 Transforms detections into persistent TrackedPerson instances over time.
 """
 
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Sequence
 import numpy as np
-import supervision as sv
 from trackers import ByteTrackTracker
 
-from src.domain.schema import Point, BoundingBox, Detection, TrackedPerson
+from src.domain.schema import Point, BoundingBox, Detection, TrackedPerson, Zone
 from src.domain.config import TrackerConfig
-from src.analytics.spatial import is_person_in_queue
+from src.analytics.spatial import is_person_in_zones
 
 
 def create_tracker(config: TrackerConfig) -> ByteTrackTracker:
@@ -27,7 +26,7 @@ def update_tracks(
     tracker: ByteTrackTracker,
     detections: Tuple[Detection, ...],
     timestamp: float,
-    queue_polygon: Tuple[Point, ...],
+    zones: Sequence[Zone],
     track_history: Dict[int, float],  # Maps track_id -> first_seen_timestamp
 ) -> Tuple[Tuple[TrackedPerson, ...], Dict[int, float]]:
     """
@@ -37,12 +36,15 @@ def update_tracks(
         tracker: ByteTrackTracker instance.
         detections: Tuple of Detection objects from current frame.
         timestamp: Current frame timestamp in seconds.
-        queue_polygon: Polygon defining the queue boundary in pixel coordinates.
+        zones: Sequence of Zone definitions (id, label, pixel-coordinate points)
+            defining the queue boundary regions.
         track_history: Mapping of track_id to initial timestamp.
 
     Returns:
         Tuple of updated TrackedPerson objects, and updated track_history dictionary.
     """
+    import supervision as sv
+
     if not detections:
         sv_dets = sv.Detections.empty()
     else:
@@ -85,7 +87,7 @@ def update_tracks(
 
             first_seen = updated_history[track_id]
             bottom_pt = bbox.bottom_center
-            in_queue = is_person_in_queue(bottom_pt, queue_polygon)
+            zone_ids = is_person_in_zones(bottom_pt, zones)
 
             tracked_persons.append(
                 TrackedPerson(
@@ -96,7 +98,8 @@ def update_tracks(
                     confidence=conf,
                     first_seen_timestamp=first_seen,
                     last_seen_timestamp=timestamp,
-                    is_in_queue=in_queue,
+                    is_in_queue=len(zone_ids) > 0,
+                    in_zone_ids=zone_ids,
                 )
             )
 

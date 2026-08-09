@@ -9,21 +9,20 @@ and deterministic.
 import pytest
 from starlette.testclient import TestClient
 
-# Import via backward-compatible re-export — tests verify the public API path
-from src.rpc.server import app, state, route_rpc_request
-from src.rpc.protocol import RPCRequest, RPCResponse
-from src.domain.schema import Point, QueueSnapshot
+from src.transport.server import app, state, route_rpc_request
+from src.transport.protocol import RPCRequest, RPCResponse, RPCError
+from src.domain.schema import Point, QueueSnapshot, Zone
 
 
 @pytest.fixture(autouse=True)
 def reset_state():
     """Snapshot and restore the mutable global `state` around every test."""
-    saved_roi = state.active_roi_points
+    saved_zones = state.active_zones
     saved_snapshot = state.latest_snapshot
     saved_history = dict(state.track_history)
     saved_sockets = set(state.active_websockets)
     yield
-    state.active_roi_points = saved_roi
+    state.active_zones = saved_zones
     state.latest_snapshot = saved_snapshot
     state.track_history = saved_history
     state.active_websockets = saved_sockets
@@ -40,15 +39,58 @@ def test_health_check():
     assert "patient-queue" in body["service"]
 
 
-def test_get_roi_default():
-    resp = _CLIENT.get("/api/roi")
+def test_get_zones_default():
+    resp = _CLIENT.get("/api/zones")
     assert resp.status_code == 200
     bodies = resp.json()
-    assert bodies["zone_name"] == state.config.roi.zone_name
-    assert len(bodies["polygon_points"]) == len(state.active_roi_points)
+    assert isinstance(bodies, list)
+    assert len(bodies) == len(state.active_zones)
+    assert bodies[0]["label"] == state.config.roi.zones[0].label
 
 
-def test_set_roi_rest_updates_state():
+def test_get_roi_backward_compat():
+    """GET /api/roi still returns the first zone's points for backward compat."""
+    resp = _CLIENT.get("/api/roi")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["zone_name"] == state.config.roi.zone_name
+    assert len(body["polygon_points"]) == len(state.active_roi_points)
+
+
+def test_set_zones_rest_updates_state():
+    payload = {
+        "zones": [
+            {
+                "id": "triage",
+                "label": "Triage Area",
+                "polygon_points": [
+                    {"x": 0.05, "y": 0.10},
+                    {"x": 0.95, "y": 0.10},
+                    {"x": 0.50, "y": 0.95},
+                ],
+            },
+            {
+                "id": "waiting",
+                "label": "Waiting Room",
+                "polygon_points": [
+                    {"x": 0.10, "y": 0.10},
+                    {"x": 0.30, "y": 0.10},
+                    {"x": 0.20, "y": 0.50},
+                ],
+            },
+        ]
+    }
+    resp = _CLIENT.post("/api/zones", json=payload)
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "success"
+    assert resp.json()["zone_count"] == 2
+    assert len(state.active_zones) == 2
+    assert state.active_zones[0].id == "triage"
+    assert state.active_zones[1].id == "waiting"
+
+
+def test_set_roi_rest_backward_compat():
+    """POST /api/roi still works for single-zone backward compatibility."""
     payload = {
         "polygon_points": [
             {"x": 0.05, "y": 0.10},
@@ -59,9 +101,7 @@ def test_set_roi_rest_updates_state():
     resp = _CLIENT.post("/api/roi", json=payload)
     assert resp.status_code == 200
     assert resp.json()["status"] == "success"
-    assert len(state.active_roi_points) == 3
-    updated = _CLIENT.get("/api/roi").json()
-    assert updated["polygon_points"][0] == {"x": 0.05, "y": 0.10}
+    assert len(state.active_zones) == 1
 
 
 def test_set_roi_rest_rejects_too_few_points():
@@ -75,7 +115,33 @@ def test_set_roi_rest_rejects_too_few_points():
 # ── RPC dispatch (route_rpc_request) ───────────────────────────────────────────
 
 
+def _zones_params():
+    return {
+        "zones": [
+            {
+                "id": "main",
+                "label": "Main Queue",
+                "polygon_points": [
+                    {"x": 0.1, "y": 0.1},
+                    {"x": 0.9, "y": 0.1},
+                    {"x": 0.5, "y": 0.9},
+                ],
+            },
+            {
+                "id": "secondary",
+                "label": "Secondary Queue",
+                "polygon_points": [
+                    {"x": 0.1, "y": 0.1},
+                    {"x": 0.3, "y": 0.1},
+                    {"x": 0.2, "y": 0.5},
+                ],
+            },
+        ]
+    }
+
+
 def _zone_params():
+    """Backward-compatible single-zone params."""
     return {
         "polygon_points": [
             {"x": 0.1, "y": 0.1},
@@ -85,18 +151,30 @@ def _zone_params():
     }
 
 
-def test_route_set_queue_zone():
-    before = state.active_roi_points
+def test_route_set_queue_zones():
+    before = state.active_zones
+    req = RPCRequest(
+        jsonrpc="2.0", id=1, method="set_queue_zones", params=_zones_params()
+    )
+    resp = route_rpc_request(req)
+    assert resp.error is None
+    assert resp.result["status"] == "success"
+    assert resp.result["zone_count"] == 2
+    # State mutation persists on the shared boundary.
+    assert len(state.active_zones) == 2
+    assert state.active_zones != before
+
+
+def test_route_set_queue_zone_deprecated():
+    """Deprecated set_queue_zone method still works, wraps into 1-element zones."""
     req = RPCRequest(
         jsonrpc="2.0", id=1, method="set_queue_zone", params=_zone_params()
     )
     resp = route_rpc_request(req)
     assert resp.error is None
     assert resp.result["status"] == "success"
-    assert resp.result["vertex_count"] == 3
-    # State mutation persists on the shared boundary.
-    assert len(state.active_roi_points) == 3
-    assert state.active_roi_points != before
+    assert resp.result["zone_count"] == 1
+    assert len(state.active_zones) == 1
 
 
 def test_route_get_current_metrics_when_none():

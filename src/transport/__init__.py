@@ -8,6 +8,8 @@ from src.transport.protocol import (
     RPCResponse,
     RPCError,
     RPCEvent,
+    ZoneDTO,
+    SetQueueZonesParams,
     SetQueueZoneParams,
     QueueMetricsPayload,
 )
@@ -19,6 +21,8 @@ __all__ = [
     "RPCResponse",
     "RPCError",
     "RPCEvent",
+    "ZoneDTO",
+    "SetQueueZonesParams",
     "SetQueueZoneParams",
     "QueueMetricsPayload",
     "app",
