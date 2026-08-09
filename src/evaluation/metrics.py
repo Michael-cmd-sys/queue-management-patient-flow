@@ -9,7 +9,7 @@ defined in the thesis.
 import math
 from typing import Sequence
 
-from src.domain.schema import QueueSnapshot, TrackedPerson, EvaluationReport
+from src.domain.schema import QueueSnapshot, TrackedPerson, EvaluationReport, Zone
 
 
 def calculate_expected_wait_time(
@@ -38,15 +38,23 @@ def compute_queue_snapshot(
     timestamp: float,
     tracks: Sequence[TrackedPerson],
     service_rate_per_min: float,
+    zones: Sequence[Zone] = (),
 ) -> QueueSnapshot:
     """
     Pure transformation mapping active temporal tracks into a QueueSnapshot.
+
+    When *zones* is provided, per-zone membership counts are derived from each
+    track's ``in_zone_ids`` field.  When omitted (or empty), the legacy
+    single-zone ``is_in_queue`` flag is used and ``zone_counts`` is empty —
+    preserving backward-compatible single-zone behaviour.
 
     Args:
         frame_index: Frame index number.
         timestamp: Current video/stream timestamp in seconds.
         tracks: Sequence of active tracked persons in the current frame.
         service_rate_per_min: Service rate hyperparameter.
+        zones: Sequence of Zone definitions (each with an ``id`` and ``points``)
+            used to compute per-zone counts.
 
     Returns:
         Immutable QueueSnapshot object.
@@ -64,6 +72,10 @@ def compute_queue_snapshot(
 
     ewt = calculate_expected_wait_time(in_queue_count, service_rate_per_min)
 
+    zone_counts = {
+        zone.id: sum(1 for t in tracks if zone.id in t.in_zone_ids) for zone in zones
+    }
+
     return QueueSnapshot(
         timestamp=timestamp,
         frame_index=frame_index,
@@ -73,6 +85,7 @@ def compute_queue_snapshot(
         active_queue_ids=tuple(t.track_id for t in in_queue_tracks),
         avg_dwell_time_sec=avg_dwell,
         estimated_wait_time_sec=ewt,
+        zone_counts=zone_counts,
     )
 
 
@@ -99,10 +112,9 @@ def calculate_mape(actuals: Sequence[float], predictions: Sequence[float]) -> fl
 
     MAPE = 100/n * sum(|actual - pred| / actual).
 
-    Windows where ``actual <= 0`` are excluded from both the numerator and
-    denominator (division by zero is undefined, and negative actual values are
-    not meaningful for percentage error). The returned value is scaled to 100×
-    the fractional error (i.e. a percentage).
+    Windows where ``actual == 0`` are excluded from both the numerator and
+    denominator (division by zero is undefined). The returned value is scaled
+    to 100× the fractional error (i.e. a percentage).
     """
     if not actuals or len(actuals) != len(predictions):
         return 0.0

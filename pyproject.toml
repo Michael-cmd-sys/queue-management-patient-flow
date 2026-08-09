@@ -26,3 +26,8 @@ markers = [
     "slow: heavy integration tests requiring models/video (deselected by default)",
 ]
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.2",
+]
