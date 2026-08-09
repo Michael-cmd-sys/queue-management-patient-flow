@@ -431,7 +431,10 @@ Maintain a countable evidence trail:
 ```text
 Records identified
       ↓
-Duplicates removed
+Records removed before screening
+  ├── Duplicates removed
+  ├── Records marked ineligible by automation tools
+  └── Records removed for other protocol-defined reasons
       ↓
 Records screened
       ↓
@@ -453,6 +456,8 @@ PRISMA provides flow-diagram templates specifically to represent this movement o
 Every number should be explainable.
 
 Do not invent counts.
+
+Document how each count maps to the PRISMA 2020 flow diagram template. This includes explicitly tracking records removed before screening (duplicates, automated exclusions, and other protocol-defined removals) as distinct categories that branch out before the "Records screened" stage.
 
 ---
 
@@ -1691,7 +1696,7 @@ PRISMA-LSR
 → living systematic reviews
 ```
 
-The official PRISMA site maintains these extensions. ([PRISMA statement][2])
+The official PRISMA site maintains these extensions. ([PRISMA statement][8])
 
 ---
 
@@ -2032,13 +2037,13 @@ claim:
   type: synthesis
 
 evidence:
-  - evidence_id: EVID-003
+  - evidence_id: EVIDENCE-003
     source_id: SRC-017
     relationship: supports
-  - evidence_id: EVID-011
+  - evidence_id: EVIDENCE-011
     source_id: SRC-024
     relationship: supports
-  - evidence_id: EVID-019
+  - evidence_id: EVIDENCE-019
     source_id: SRC-031
     relationship: contradicts
 
@@ -2099,7 +2104,7 @@ And **that last one is particularly valuable**.
 
 The official PRISMA 2020 expanded checklist explicitly distinguishes essential reporting elements from additional ones. ([PRISMA statement][7]) The flow diagram exists to make the movement from identified records through screening and inclusion visible. ([PRISMA statement][4])
 
-We can therefore turn the methodology into **state transitions**:
+Inspired by PRISMA's reporting discipline, we can design an **application-level workflow state machine** that enforces epistemic rigor:
 
 ```text
 DISCOVERED
@@ -2121,6 +2126,15 @@ CLAIMED
 REPORTED
 ```
 
+**Important**: This state sequence is not defined or mandated by PRISMA itself. Rather, it is an application design choice that operationalizes PRISMA's principles. The states map to PRISMA reporting concepts as follows:
+
+- **DISCOVERED/DEDUPLICATED/SCREENED** relate to PRISMA flow diagram identification and screening counts (items 5-10 of PRISMA 2020)
+- **ELIGIBLE** corresponds to full-text eligibility assessment reporting (items 11-12)
+- **EXTRACTED** relates to PRISMA data collection and data items reporting (items 13a-13b)
+- **APPRAISED** relates to PRISMA risk of bias assessment reporting (items 14-15)
+- **SYNTHESIZED** relates to PRISMA synthesis methods and results reporting (items 16-20)
+- **CLAIMED/REPORTED** relate to PRISMA interpretation and conclusions reporting (items 24-26)
+
 An agent should **not be allowed to synthesize a paper that has not been extracted**, and it should **not be allowed to make a strong claim from evidence that hasn't been appraised**.
 
 That is the bit I'd really want to build into your application.
@@ -2136,3 +2150,4 @@ PRISMA itself is about transparent reporting; your application can take that phi
 [5]: https://www.prisma-statement.org/prisma-2020-statement?utm_source=chatgpt.com "PRISMA 2020 statement — PRISMA statement"
 [6]: https://www.prisma-statement.org/lsr?utm_source=chatgpt.com "LSR — PRISMA statement"
 [7]: https://www.prisma-statement.org/s/PRISMA_2020_expanded_checklist-yc78.pdf?utm_source=chatgpt.com "PRISMA 2020 expanded checklist"
+[8]: https://www.prisma-statement.org/extensions "Extensions — PRISMA statement"
