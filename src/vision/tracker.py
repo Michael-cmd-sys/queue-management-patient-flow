@@ -3,17 +3,24 @@ Multi-object tracking wrapper using ByteTrackTracker via the trackers library.
 Transforms detections into persistent TrackedPerson instances over time.
 """
 
-from typing import Tuple, Dict
-import numpy as np
-from trackers import ByteTrackTracker
+from __future__ import annotations
 
-from src.domain.schema import Point, BoundingBox, Detection, TrackedPerson
-from src.domain.config import TrackerConfig
+from typing import TYPE_CHECKING
+
+import numpy as np
+
 from src.analytics.spatial import is_person_in_queue
+from src.domain.config import TrackerConfig
+from src.domain.schema import BoundingBox, Detection, Point, TrackedPerson
+
+if TYPE_CHECKING:
+    from trackers import ByteTrackTracker
 
 
 def create_tracker(config: TrackerConfig) -> ByteTrackTracker:
     """Initialize ByteTrackTracker instance using the modern trackers library."""
+    from trackers import ByteTrackTracker
+
     return ByteTrackTracker(
         track_activation_threshold=config.track_thresh,
         lost_track_buffer=config.track_buffer,
@@ -24,11 +31,11 @@ def create_tracker(config: TrackerConfig) -> ByteTrackTracker:
 
 def update_tracks(
     tracker: ByteTrackTracker,
-    detections: Tuple[Detection, ...],
+    detections: tuple[Detection, ...],
     timestamp: float,
-    queue_polygon: Tuple[Point, ...],
-    track_history: Dict[int, float],  # Maps track_id -> first_seen_timestamp
-) -> Tuple[Tuple[TrackedPerson, ...], Dict[int, float]]:
+    queue_polygon: tuple[Point, ...],
+    track_history: dict[int, float],  # Maps track_id -> first_seen_timestamp
+) -> tuple[tuple[TrackedPerson, ...], dict[int, float]]:
     """
     Update tracker with current frame detections.
 
