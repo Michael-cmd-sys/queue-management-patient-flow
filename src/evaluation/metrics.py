@@ -94,7 +94,15 @@ def calculate_rmse(actuals: Sequence[float], predictions: Sequence[float]) -> fl
 
 
 def calculate_mape(actuals: Sequence[float], predictions: Sequence[float]) -> float:
-    """Mean Absolute Percentage Error (MAPE) = 100/n * sum(|actual - pred| / actual)."""
+    """
+    Mean Absolute Percentage Error (MAPE).
+
+    MAPE = 100/n * sum(|actual - pred| / actual).
+
+    Windows where ``actual == 0`` are excluded from both the numerator and
+    denominator (division by zero is undefined). The returned value is scaled
+    to 100× the fractional error (i.e. a percentage).
+    """
     if not actuals or len(actuals) != len(predictions):
         return 0.0
     valid_pairs = [(act, pred) for act, pred in zip(actuals, predictions) if act > 0]
