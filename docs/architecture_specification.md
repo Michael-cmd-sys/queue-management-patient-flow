@@ -59,9 +59,10 @@ The system is designed as a **decoupled, real-time, event-driven computer vision
 #### Layer 3: WebSocket-RPC Gateway (`src/transport/`)
 * **`protocol.py`**: Strongly-typed JSON-RPC 2.0 protocol specifications (`RPCRequest`, `RPCResponse`, `RPCEvent`).
 * **`server.py`**: FastAPI WebSocket endpoint exposing procedures:
-  - `rpc.set_queue_zone(points)`: Dynamically updates active ROI polygon.
-  - `rpc.get_current_metrics()`: Fetches immediate queue snapshot.
-  - `rpc.stream_metrics()`: Continuous push broadcast of `QueueSnapshot` events.
+  - `rpc.set_queue_zones(zones)`: Replaces the active ROI with one or more named zones (primary procedure).
+  - `rpc.set_queue_zone(zones)` *(deprecated)*: Single-zone backward-compatible alias.
+  - `rpc.get_current_metrics()`: Returns the latest `QueueSnapshot` on demand.
+  - `queue_metrics_update` WebSocket events provide continuous push broadcasts of `QueueSnapshot` updates (not a polling RPC method).
 
 #### Layer 4: Interactive Dashboard Frontend (`dashboard/`)
 * **`src/components/QueueTelemetry`**: Fine-grained reactive gauges displaying patient count, dwell time, and EWT.
