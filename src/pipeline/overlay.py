@@ -52,9 +52,15 @@ def draw_pipeline_overlay(
     annotated = frame.copy()
 
     # Convert ROI zone points (if normalized 0..1) to pixel coordinates
-    pixel_zones: Tuple[Zone, ...] = ()
     pts_list: list[list[list[int]]] = []
     colors = []
+    palette = [
+        (0, 255, 0),  # green
+        (255, 0, 0),  # blue
+        (0, 255, 255),  # yellow
+        (0, 165, 255),  # orange
+        (255, 0, 255),  # magenta
+    ]
     for zone in roi_config.zones:
         poly_pts = []
         for pt in zone.points:
@@ -62,8 +68,7 @@ def draw_pipeline_overlay(
             py = int(pt.y * frame_height) if pt.y <= 1.0 else int(pt.y)
             poly_pts.append([px, py])
         pts_list.append(poly_pts)
-        colors.append(next(_ZONE_COLORS))
-
+        colors.append(palette[len(colors) % len(palette)])
     # 1. Draw semi-transparent queue zone polygons (one per zone)
     for poly_pts, color in zip(pts_list, colors):
         poly_arr = np.array(poly_pts, dtype=np.int32)
