@@ -17,7 +17,15 @@ def is_point_in_polygon(point: Point, polygon: Sequence[Point]) -> bool:
         polygon: Sequence of Point(x, y) vertices defining the polygon boundary.
 
     Returns:
-        True if the point lies strictly inside or on the polygon, False otherwise.
+        True if the point lies inside or on the polygon boundary; False otherwise.
+
+    .. note::
+        When the point lies exactly on a polygon edge, the result depends on
+        the specific vertex ordering and floating-point precision. The
+        ray-casting algorithm does not guarantee consistent behavior for
+        on-boundary points; callers requiring strict on-boundary membership
+        should add an explicit epsilon tolerance or snap points to the
+        nearest grid cell.
     """
     n = len(polygon)
     if n < 3:
