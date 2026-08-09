@@ -118,7 +118,7 @@ queue-management-patient-flow/
 ### Prerequisites
 * Python $\ge 3.13$
 * [`uv`](https://github.com/astral-sh/uv) fast package manager
-* `models/best.pt` — Custom fine-tuned YOLOv8 weights **not distributed via git** (see `.gitignore`). Download from the [release assets](https://github.com/Michael-cmd-sys/queue-management-patient-flow/releases) or train a custom model per the thesis data, then place at `models/best.pt` before running.
+* `models/best.pt` — Custom fine-tuned YOLOv8 weights **not committed to git** (see `.gitignore`). Download from the [release assets](https://github.com/Michael-cmd-sys/queue-management-patient-flow/releases) or train a custom model per the thesis data, then place at `models/best.pt` before running.
 
 ### 1. Installation & Environment Setup
 ```bash
