@@ -16,18 +16,18 @@
 ### Task 1: Implement Frame Sampling in Pipeline
 
 **Files:**
-- Modify: `src/pipeline.py:1-205`
-- Modify: `src/config.py:44-49`
+- Modify: `src/pipeline/runner.py`
+- Modify: `src/domain/config.py:51`
 
-- [ ] **Step 1: Write failing test for frame sampling**
+- [x] **Step 1: Write failing test for frame sampling**
 
 In `tests/test_analytics.py`, add:
 
 ```python
 def test_pipeline_respects_sampling_fps():
     """Pipeline should skip frames when sampling_fps < video fps."""
-    from src.config import PipelineConfig, ROIConfig, VisionConfig, AnalyticsConfig
-    from src.pipeline import run_pipeline
+    from src.domain.config import PipelineConfig, ROIConfig, VisionConfig, AnalyticsConfig
+    from src.pipeline.runner import run_pipeline
     
     config = PipelineConfig(
         vision=VisionConfig(model_path=Path("models/best.pt")),
@@ -43,14 +43,14 @@ def test_pipeline_respects_sampling_fps():
     assert len(snapshots) < 500
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/test_analytics.py::test_pipeline_respects_sampling_fps -v`
 Expected: FAIL with assertion error (too many snapshots, or no sampling logic)
 
-- [ ] **Step 3: Implement frame sampling in pipeline**
+- [x] **Step 3: Implement frame sampling in pipeline**
 
-Modify `src/config.py` — add `frame_step: int` to `AnalyticsConfig`:
+Modify `src/domain/config.py` — add `frame_step: int` to `AnalyticsConfig`:
 
 ```python
 @dataclass(frozen=True)
@@ -67,7 +67,7 @@ class AnalyticsConfig:
         # frame_step computed dynamically based on video fps
 ```
 
-Modify `src/pipeline.py:111` — compute `frame_step` and skip frames:
+Modify `src/pipeline/runner.py` — compute `frame_step` and skip frames:
 
 ```python
 fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
@@ -82,15 +82,15 @@ if frame_idx % frame_step != 0:
     continue
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pytest tests/test_analytics.py::test_pipeline_respects_sampling_fps -v`
 Expected: PASS with ~169 snapshots
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
-git add src/config.py src/pipeline.py tests/test_analytics.py
+git add src/domain/config.py src/pipeline/runner.py tests/test_analytics.py
 git commit -m "feat: add frame sampling to pipeline based on sampling_fps config"
 ```
 
@@ -386,16 +386,16 @@ git commit -m "feat: integrate dashboard layout with RoiCanvas and QueueTelemetr
 
 **Files:**
 - Create: `src/evaluation/report.py`
-- Modify: `src/schema.py:81-89`
+- Modify: `src/domain/schema.py:81-89`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 In `tests/test_analytics.py`, add:
 
 ```python
 def test_generate_evaluation_report():
     from src.evaluation.report import generate_evaluation_report
-    from src.schema import EvaluationReport
+    from src.domain.schema import EvaluationReport
     
     snapshots = [
         QueueSnapshot(timestamp=0.0, frame_index=0, in_queue_count=5, out_of_queue_count=2,
@@ -414,19 +414,19 @@ def test_generate_evaluation_report():
     assert report.rmse >= 0
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/test_analytics.py::test_generate_evaluation_report -v`
 Expected: FAIL with "generate_evaluation_report not found"
 
-- [ ] **Step 3: Implement report generator**
+- [x] **Step 3: Implement report generator**
 
 Create `src/evaluation/report.py`:
 
 ```python
 from typing import List, Tuple
-from src.schema import QueueSnapshot, EvaluationReport
-from src.analytics.queue_math import calculate_mae, calculate_rmse, calculate_mape
+from src.domain.schema import QueueSnapshot, EvaluationReport
+from src.evaluation.metrics import calculate_mae, calculate_rmse, calculate_mape
 
 
 def generate_evaluation_report(
@@ -457,12 +457,12 @@ def generate_evaluation_report(
     )
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pytest tests/test_analytics.py::test_generate_evaluation_report -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/evaluation/report.py tests/test_analytics.py
@@ -477,7 +477,7 @@ git commit -m "feat: add evaluation report generator for thesis metrics"
 **Files:**
 - Create: `tests/test_rpc_server.py`
 
-- [ ] **Step 1: Write failing test for RPC method dispatch**
+- [x] **Step 1: Write failing test for RPC method dispatch**
 
 Create `tests/test_rpc_server.py`:
 
@@ -485,7 +485,7 @@ Create `tests/test_rpc_server.py`:
 import json
 import pytest
 from fastapi.testclient import TestClient
-from src.rpc.server import app
+from src.transport.server import app
 
 client = TestClient(app)
 
@@ -541,14 +541,14 @@ def test_websocket_rpc_unknown_method():
         assert response["error"]["code"] == -32601
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/test_rpc_server.py -v`
 Expected: FAIL (server imports will fail due to missing dependencies or state issues)
 
-- [ ] **Step 3: Fix server imports for testability**
+- [x] **Step 3: Fix server imports for testability**
 
-Modify `src/rpc/server.py` to guard model loading:
+Modify `src/transport/server.py` to guard model loading:
 
 ```python
 # At top of file, after imports
@@ -561,15 +561,15 @@ except Exception as e:
     byte_tracker = None
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/test_rpc_server.py -v`
 Expected: All PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
-git add tests/test_rpc_server.py src/rpc/server.py
+git add tests/test_rpc_server.py src/transport/server.py
 git commit -m "test: add FastAPI RPC server integration tests"
 ```
 
@@ -584,7 +584,7 @@ git commit -m "test: add FastAPI RPC server integration tests"
 - [ ] **Step 1: Review git status**
 
 Run: `git status`
-Expected: Shows modified `pyproject.toml`, `uv.lock`, and untracked `src/rpc/`, `dashboard/`, `docs/architecture_specification.md`
+Expected: All Phases 1/3/4 changes already committed; clean working tree except for Phase 2 deliverables (dashboard/) which are not yet created. Run `git status` to confirm before staging Phase 5 cleanup.
 
 - [ ] **Step 2: Stage all intended changes**
 
@@ -619,10 +619,10 @@ Expected: No type errors (or fix any that exist)
 ---
 ## Execution Order Summary
 
-1. **Phase 1** — Frame sampling (backend improvement, unblocks accurate metrics)
-2. **Phase 2** — Dashboard frontend (RoiCanvas, QueueTelemetry, App layout)
-3. **Phase 3** — Evaluation report automation (thesis metrics)
-4. **Phase 4** — RPC/WebSocket tests (coverage for gateway)
-5. **Phase 5** — Git cleanup and final verification
+1. **[x] Phase 1** — Frame sampling (backend improvement, unblocks accurate metrics)
+2. **[ ] Phase 2** — Dashboard frontend (RoiCanvas, QueueTelemetry, App layout)
+3. **[x] Phase 3** — Evaluation report automation (thesis metrics)
+4. **[x] Phase 4** — RPC/WebSocket tests (coverage for gateway)
+5. **[ ] Phase 5** — Git cleanup and final verification
 
 Each phase produces independently runnable, tested software. No step depends on a later phase.
