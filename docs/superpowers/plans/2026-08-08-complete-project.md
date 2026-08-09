@@ -1,5 +1,7 @@
 # Complete Project Implementation Plan
 
+> **Historical document:** This plan was written before `src/rpc/` was renamed to `src/transport/` and before the OctaneJS technology decision (see Issue #9). Code references in this document reflect the original project state and should not be interpreted as the current architecture.
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Complete the KNUST Patient Queue Flow Surveillance system by building the missing OctaneJS dashboard frontend, implementing frame sampling, automating evaluation reports, adding RPC/WebSocket tests, and cleaning up git state.
