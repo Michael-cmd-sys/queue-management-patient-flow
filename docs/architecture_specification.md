@@ -27,7 +27,7 @@ The system is designed as a **decoupled, real-time, event-driven computer vision
                                                      |
                                                      v
                                  +---------------------------------------+
-                                 |    OctaneJS + Vite Web Dashboard      |
+                                 |    OctaneJS + Vite Web Dashboard *(planned)* |
                                  |  - HTML5 Canvas Interactive ROI Editor |
                                  |  - No-VDOM Atomic 60 FPS UI          |
                                  |  - Live Patient Count & EWT Gauges    |
@@ -64,9 +64,9 @@ The system is designed as a **decoupled, real-time, event-driven computer vision
   - `rpc.get_current_metrics()`: Returns the latest `QueueSnapshot` on demand.
   - `queue_metrics_update` WebSocket events provide continuous push broadcasts of `QueueSnapshot` updates (not a polling RPC method).
 
-#### Layer 4: Interactive Dashboard Frontend (`dashboard/`)
-* **`src/components/QueueTelemetry`**: Fine-grained reactive gauges displaying patient count, dwell time, and EWT.
-* **Video stream**: `/api/video_feed` — annotated MJPEG multipart stream from `generate_video_mjpeg()`.
+#### Layer 4: Interactive Dashboard Frontend (`dashboard/`) — *planned, not yet implemented*
+* **`/api/video_feed`** (backend, implemented): annotated MJPEG multipart stream from `generate_video_mjpeg()`.
+* **Frontend (planned)**: an OctaneJS + Vite dashboard with `src/components/QueueTelemetry` reactive gauges for patient count, dwell time, and EWT. Not present in the current module tree.
 
 #### Layer 5: Pipeline Orchestration (`src/pipeline/`)
 * **`runner.py`**: I/O orchestration (video capture, frame sampling, model loading, annotated video output, metrics export).
