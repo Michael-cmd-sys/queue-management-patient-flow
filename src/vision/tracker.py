@@ -14,6 +14,8 @@ from src.analytics.spatial import is_person_in_zones
 
 def create_tracker(config: TrackerConfig) -> ByteTrackTracker:
     """Initialize ByteTrackTracker instance using the modern trackers library."""
+    from trackers import ByteTrackTracker
+
     return ByteTrackTracker(
         track_activation_threshold=config.track_thresh,
         lost_track_buffer=config.track_buffer,
@@ -24,7 +26,7 @@ def create_tracker(config: TrackerConfig) -> ByteTrackTracker:
 
 def update_tracks(
     tracker: ByteTrackTracker,
-    detections: Tuple[Detection, ...],
+    detections: tuple[Detection, ...],
     timestamp: float,
     zones: Sequence[Zone],
     track_history: Dict[int, float],  # Maps track_id -> first_seen_timestamp
