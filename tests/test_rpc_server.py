@@ -9,9 +9,10 @@ and deterministic.
 import pytest
 from starlette.testclient import TestClient
 
+# Import from the canonical transport layer
 from src.transport.server import app, state, route_rpc_request
-from src.transport.protocol import RPCRequest, RPCResponse, RPCError
-from src.domain.schema import Point, QueueSnapshot, Zone
+from src.transport.protocol import RPCRequest, RPCResponse
+from src.domain.schema import Point, QueueSnapshot
 
 
 @pytest.fixture(autouse=True)
