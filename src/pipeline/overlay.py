@@ -4,28 +4,17 @@ Visualization utilities for drawing pipeline overlays on video frames.
 Pure image transformation functions — no I/O, no state mutation.
 """
 
-import numpy as np
+
 import cv2
-from typing import Tuple, Sequence
-from itertools import cycle
+import numpy as np
 
-from src.domain.schema import Point, TrackedPerson, QueueSnapshot, Zone
 from src.domain.config import ROIConfig
-
-_ZONE_COLORS = cycle(
-    [
-        (0, 255, 0),  # green
-        (255, 0, 0),  # blue
-        (0, 255, 255),  # yellow
-        (0, 165, 255),  # orange
-        (255, 0, 255),  # magenta
-    ]
-)
+from src.domain.schema import QueueSnapshot, TrackedPerson
 
 
 def draw_pipeline_overlay(
     frame: np.ndarray,
-    tracks: Tuple[TrackedPerson, ...],
+    tracks: tuple[TrackedPerson, ...],
     snapshot: QueueSnapshot,
     roi_config: ROIConfig,
     frame_width: int,
@@ -102,46 +91,43 @@ def draw_pipeline_overlay(
         bx, by = int(t.bottom_point.x), int(t.bottom_point.y)
         cv2.circle(annotated, (bx, by), 4, (0, 0, 255), -1)
 
-    # 3. Draw HUD Dashboard panel at top
-    cv2.rectangle(annotated, (10, 10), (450, 110), (0, 0, 0), -1)
-    cv2.rectangle(annotated, (10, 10), (450, 110), (0, 255, 0), 2)
+    # 3. Draw HUD Dashboard panel at top (dynamically sized per zone count)
+    id_to_meta = {
+        z.id: (z.label, colors[i]) for i, z in enumerate(roi_config.zones)
+    }
 
     ewt_min = snapshot.estimated_wait_time_sec / 60.0
-    cv2.putText(
-        annotated,
-        "PATIENT QUEUE FLOW ANALYTICS",
-        (20, 32),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.55,
-        (255, 255, 255),
-        2,
+    hud_lines = [
+        ("PATIENT QUEUE FLOW ANALYTICS", (255, 255, 255), 0.55),
+        (f"In-Queue Patients: {snapshot.in_queue_count}", (0, 255, 0), 0.5),
+        (
+            f"Out-of-Queue / Transit: {snapshot.out_of_queue_count}",
+            (255, 200, 0),
+            0.5,
+        ),
+    ]
+    for zid, count in snapshot.zone_counts.items():
+        label, color = id_to_meta.get(zid, (zid, (0, 255, 255)))
+        hud_lines.append((f"{label}: {count}", color, 0.5))
+    hud_lines.append(
+        (f"Estimated Wait Time (EWT): {ewt_min:.1f} min", (0, 255, 255), 0.5)
     )
-    cv2.putText(
-        annotated,
-        f"In-Queue Patients: {snapshot.in_queue_count}",
-        (20, 58),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.5,
-        (0, 255, 0),
-        2,
-    )
-    cv2.putText(
-        annotated,
-        f"Out-of-Queue / Transit: {snapshot.out_of_queue_count}",
-        (20, 80),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.5,
-        (255, 200, 0),
-        1,
-    )
-    cv2.putText(
-        annotated,
-        f"Estimated Wait Time (EWT): {ewt_min:.1f} min",
-        (20, 100),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.5,
-        (0, 255, 255),
-        2,
-    )
+
+    panel_height = 12 + len(hud_lines) * 20
+    cv2.rectangle(annotated, (10, 10), (450, 10 + panel_height), (0, 0, 0), -1)
+    cv2.rectangle(annotated, (10, 10), (450, 10 + panel_height), (0, 255, 0), 2)
+
+    y = 32
+    for text, color, scale in hud_lines:
+        cv2.putText(
+            annotated,
+            text,
+            (20, y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            scale,
+            color,
+            2,
+        )
+        y += 20
 
     return annotated

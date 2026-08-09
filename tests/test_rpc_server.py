@@ -7,12 +7,19 @@ and deterministic.
 """
 
 import pytest
+from pydantic import ValidationError
 from starlette.testclient import TestClient
 
+from src.domain.schema import Point, QueueSnapshot, Zone
+from src.pipeline.runner import _zones_to_pixel as runner_zones_to_pixel
+from src.transport.protocol import (
+    RPCRequest,
+    SetQueueZonesParams,
+    ZoneDTO,
+)
+
 # Import from the canonical transport layer
-from src.transport.server import app, state, route_rpc_request
-from src.transport.protocol import RPCRequest, RPCResponse
-from src.domain.schema import Point, QueueSnapshot
+from src.transport.server import _zones_to_pixel, app, route_rpc_request, state
 
 
 @pytest.fixture(autouse=True)
@@ -221,3 +228,113 @@ def test_route_invalid_params_returns_error():
     assert resp.error is not None
     assert resp.error.code == -32600
     assert resp.result is None
+
+
+# ── ZoneDTO / SetQueueZonesParams contract ───────────────────────────────────
+
+
+def _zone_dto_kwargs(zid="main", label="Zone", pts=None):
+    return {
+        "id": zid,
+        "label": label,
+        "polygon_points": pts
+        or [{"x": 0.1, "y": 0.1}, {"x": 0.9, "y": 0.1}, {"x": 0.5, "y": 0.9}],
+    }
+
+
+def test_zonedto_requires_id():
+    """Omitted id is rejected at the transport boundary."""
+    with pytest.raises(ValidationError):
+        ZoneDTO(**{k: v for k, v in _zone_dto_kwargs().items() if k != "id"})
+
+
+def test_zonedto_rejects_empty_id():
+    """Empty id is rejected (min_length=1)."""
+    with pytest.raises(ValidationError):
+        ZoneDTO(**_zone_dto_kwargs(zid=""))
+
+
+def test_set_queue_zones_rejects_duplicate_ids():
+    """Repeated zone IDs across zones are rejected at the transport boundary."""
+    with pytest.raises(ValidationError):
+        SetQueueZonesParams(
+            zones=[
+                ZoneDTO(**_zone_dto_kwargs(zid="a")),
+                ZoneDTO(**_zone_dto_kwargs(zid="a")),
+            ]
+        )
+
+
+def test_set_queue_zones_accepts_unique_ids():
+    params = SetQueueZonesParams(
+        zones=[
+            ZoneDTO(**_zone_dto_kwargs(zid="a")),
+            ZoneDTO(**_zone_dto_kwargs(zid="b")),
+        ]
+    )
+    assert [z.id for z in params.zones] == ["a", "b"]
+
+
+# ── get_roi reflects active zones ────────────────────────────────────────────
+
+
+def test_get_roi_uses_first_active_zone():
+    payload = {
+        "zones": [
+            {
+                "id": "triage",
+                "label": "Triage Area",
+                "polygon_points": [
+                    {"x": 0.05, "y": 0.10},
+                    {"x": 0.95, "y": 0.10},
+                    {"x": 0.50, "y": 0.95},
+                ],
+            },
+            {
+                "id": "waiting",
+                "label": "Waiting Room",
+                "polygon_points": [
+                    {"x": 0.10, "y": 0.10},
+                    {"x": 0.30, "y": 0.10},
+                    {"x": 0.20, "y": 0.50},
+                ],
+            },
+        ]
+    }
+    set_resp = _CLIENT.post("/api/zones", json=payload)
+    assert set_resp.status_code == 200
+
+    resp = _CLIENT.get("/api/roi")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["zone_name"] == "Triage Area"
+    assert body["polygon_points"] == payload["zones"][0]["polygon_points"]
+
+
+# ── Coordinate-space conversion rule (runner + server) ───────────────────────
+
+
+@pytest.mark.parametrize(
+    "_zones_to_pixel",
+    [runner_zones_to_pixel, _zones_to_pixel],
+    ids=["runner", "server"],
+)
+def test_zones_to_pixel_normalized_scales(_zones_to_pixel):
+    """A normalized coordinate of 1.0 scales to the full frame dimension."""
+    zone = Zone(id="z", label="Z", points=(Point(1.0, 1.0),), coordinate_space="normalized")
+    out = _zones_to_pixel((zone,), 100, 200)
+    assert out[0].points[0] == Point(100.0, 200.0)
+    assert out[0].coordinate_space == "normalized"
+
+
+@pytest.mark.parametrize(
+    "_zones_to_pixel",
+    [runner_zones_to_pixel, _zones_to_pixel],
+    ids=["runner", "server"],
+)
+def test_zones_to_pixel_pixel_space_passthrough(_zones_to_pixel):
+    """A pixel-space coordinate equal to 1.0 is NOT scaled (stays 1.0)."""
+    zone = Zone(id="z", label="Z", points=(Point(1.0, 1.0),), coordinate_space="pixel")
+    out = _zones_to_pixel((zone,), 100, 200)
+    assert out[0].points[0] == Point(1.0, 1.0)
+    assert out[0].coordinate_space == "pixel"

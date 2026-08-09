@@ -7,22 +7,20 @@ to pipeline.core.process_frame (pure logic) and visualization to
 pipeline.overlay.draw_pipeline_overlay.
 """
 
-import json
-from pathlib import Path
-from typing import List, Dict, Tuple, Sequence
+from collections.abc import Sequence
+
 import cv2
 
-from src.domain.schema import Point, QueueSnapshot, TrackedPerson, Zone
 from src.domain.config import PipelineConfig, ROIConfig
-from src.vision.detector import load_yolo_model, detect_frame_objects
-from src.vision.tracker import create_tracker, update_tracks
+from src.domain.schema import Point, QueueSnapshot, TrackedPerson, Zone
 from src.evaluation.metrics import compute_queue_snapshot
-from src.pipeline.core import process_frame
-from src.pipeline.overlay import draw_pipeline_overlay
 from src.pipeline.export import export_metrics_json
+from src.pipeline.overlay import draw_pipeline_overlay
+from src.vision.detector import detect_frame_objects, load_yolo_model
+from src.vision.tracker import create_tracker, update_tracks
 
 
-def run_pipeline(config: PipelineConfig) -> List[QueueSnapshot]:
+def run_pipeline(config: PipelineConfig) -> list[QueueSnapshot]:
     """
     Run complete video processing, tracking, and analytics pipeline.
 
@@ -75,8 +73,8 @@ def run_pipeline(config: PipelineConfig) -> List[QueueSnapshot]:
         str(annotated_video_path), fourcc, fps, (width, height)
     )
 
-    snapshots: List[QueueSnapshot] = []
-    track_history: Dict[int, float] = {}
+    snapshots: list[QueueSnapshot] = []
+    track_history: dict[int, float] = {}
 
     frame_idx = 0
     # Convert ROI zone points (if normalized 0..1) to pixel coordinates
@@ -147,18 +145,28 @@ def run_pipeline(config: PipelineConfig) -> List[QueueSnapshot]:
     return snapshots
 
 
-def _zones_to_pixel(zones: Sequence[Zone], width: int, height: int) -> Tuple[Zone, ...]:
-    """Convert normalized zone points (0..1) to pixel coordinates."""
+def _zones_to_pixel(zones: Sequence[Zone], width: int, height: int) -> tuple[Zone, ...]:
+    """Convert zone points to pixel coordinates.
+
+    Uses the explicit ``coordinate_space`` of each zone rather than inferring it
+    per-coordinate: ``"pixel"`` zones are passed through unchanged, while
+    ``"normalized"`` zones (the default) are scaled by frame dimensions.  This
+    removes the ambiguity of a coordinate value exactly equal to 1.0.
+    """
     pixel_zones = []
     for zone in zones:
-        pts = tuple(
-            Point(
-                x=p.x * width if p.x <= 1.0 else p.x,
-                y=p.y * height if p.y <= 1.0 else p.y,
+        if zone.coordinate_space == "pixel":
+            pts = tuple(Point(x=p.x, y=p.y) for p in zone.points)
+        else:
+            pts = tuple(Point(x=p.x * width, y=p.y * height) for p in zone.points)
+        pixel_zones.append(
+            Zone(
+                id=zone.id,
+                label=zone.label,
+                points=pts,
+                coordinate_space=zone.coordinate_space,
             )
-            for p in zone.points
         )
-        pixel_zones.append(Zone(id=zone.id, label=zone.label, points=pts))
     return tuple(pixel_zones)
 
 
@@ -167,11 +175,11 @@ def _process_frame_with_tracker(
     model,
     tracker,
     config: PipelineConfig,
-    pixel_zones: Tuple[Zone, ...],
+    pixel_zones: tuple[Zone, ...],
     frame_idx: int,
     fps: float,
-    track_history: Dict[int, float],
-) -> Tuple[Tuple[TrackedPerson, ...], QueueSnapshot, Dict[int, float]]:
+    track_history: dict[int, float],
+) -> tuple[tuple[TrackedPerson, ...], QueueSnapshot, dict[int, float]]:
     """Internal: process a frame using already-loaded model and tracker."""
     timestamp = frame_idx / fps
 

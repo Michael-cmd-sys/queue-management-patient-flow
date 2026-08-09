@@ -3,8 +3,10 @@ Core domain data structures and immutable schemas for Queue Management.
 Follows Functional Programming principles: frozen (immutable) dataclasses, pure data objects.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Mapping, NamedTuple, Tuple
+from types import MappingProxyType
+from typing import NamedTuple
 
 
 class Point(NamedTuple):
@@ -19,7 +21,8 @@ class Zone(NamedTuple):
 
     id: str
     label: str
-    points: Tuple[Point, ...]
+    points: tuple[Point, ...]
+    coordinate_space: str = "normalized"
 
 
 class BoundingBox(NamedTuple):
@@ -70,7 +73,7 @@ class TrackedPerson:
     first_seen_timestamp: float
     last_seen_timestamp: float
     is_in_queue: bool
-    in_zone_ids: Tuple[str, ...] = ()
+    in_zone_ids: tuple[str, ...] = ()
 
     @property
     def dwell_duration_sec(self) -> float:
@@ -87,10 +90,10 @@ class QueueSnapshot:
     in_queue_count: int
     out_of_queue_count: int
     total_active_tracks: int
-    active_queue_ids: Tuple[int, ...]
+    active_queue_ids: tuple[int, ...]
     avg_dwell_time_sec: float
     estimated_wait_time_sec: float
-    zone_counts: Mapping[str, int] = field(default_factory=dict)
+    zone_counts: Mapping[str, int] = field(default_factory=lambda: MappingProxyType({}))
 
 
 @dataclass(frozen=True)

@@ -9,7 +9,8 @@ testable handler in transport.server.
 
 import asyncio
 import json
-from typing import Dict, List, Set, Tuple, Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import cv2
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -18,18 +19,18 @@ from fastapi.responses import StreamingResponse
 
 from src.domain.config import PipelineConfig, ROIConfig
 from src.domain.schema import Point, QueueSnapshot, Zone
-from src.vision.detector import load_yolo_model, detect_frame_objects
-from src.vision.tracker import create_tracker, update_tracks
 from src.evaluation.metrics import compute_queue_snapshot
 from src.pipeline.overlay import draw_pipeline_overlay
 from src.transport.protocol import (
-    RPCRequest,
-    RPCResponse,
     RPCError,
     RPCEvent,
-    SetQueueZonesParams,
+    RPCRequest,
+    RPCResponse,
     SetQueueZoneParams,
+    SetQueueZonesParams,
 )
+from src.vision.detector import detect_frame_objects, load_yolo_model
+from src.vision.tracker import create_tracker, update_tracks
 
 _CR_LF = bytes([13, 10])
 _FRAME_BOUNDARY = b"--frame"
@@ -55,13 +56,13 @@ class SystemState:
 
     def __init__(self):
         self.config = PipelineConfig()
-        self.active_zones: Tuple[Zone, ...] = self.config.roi.zones
+        self.active_zones: tuple[Zone, ...] = self.config.roi.zones
         self.latest_snapshot: QueueSnapshot | None = None
-        self.track_history: Dict[int, float] = {}
-        self.active_websockets: Set[WebSocket] = set()
+        self.track_history: dict[int, float] = {}
+        self.active_websockets: set[WebSocket] = set()
 
     @property
-    def active_roi_points(self) -> Tuple[Point, ...]:
+    def active_roi_points(self) -> tuple[Point, ...]:
         """Backward-compatible accessor: returns the first active zone's points."""
         if self.active_zones:
             return self.active_zones[0].points
@@ -71,18 +72,27 @@ class SystemState:
 state = SystemState()
 
 
-def _zones_to_pixel(zones: Sequence[Zone], width: int, height: int) -> Tuple[Zone, ...]:
-    """Convert normalized zone points (0..1) to pixel coordinates."""
+def _zones_to_pixel(zones: Sequence[Zone], width: int, height: int) -> tuple[Zone, ...]:
+    """Convert zone points to pixel coordinates.
+
+    Uses the explicit ``coordinate_space`` of each zone rather than inferring it
+    per-coordinate: ``"pixel"`` zones pass through unchanged, ``"normalized"``
+    (the default) zones are scaled by frame dimensions.
+    """
     pixel_zones = []
     for zone in zones:
-        pts = tuple(
-            Point(
-                x=p.x * width if p.x <= 1.0 else p.x,
-                y=p.y * height if p.y <= 1.0 else p.y,
+        if zone.coordinate_space == "pixel":
+            pts = tuple(Point(x=p.x, y=p.y) for p in zone.points)
+        else:
+            pts = tuple(Point(x=p.x * width, y=p.y * height) for p in zone.points)
+        pixel_zones.append(
+            Zone(
+                id=zone.id,
+                label=zone.label,
+                points=pts,
+                coordinate_space=zone.coordinate_space,
             )
-            for p in zone.points
         )
-        pixel_zones.append(Zone(id=zone.id, label=zone.label, points=pts))
     return tuple(pixel_zones)
 
 
@@ -103,7 +113,7 @@ def get_vision_runtime():
     return _yolo_model, _byte_tracker
 
 
-async def broadcast_event(event_name: str, payload: Dict[str, Any]):
+async def broadcast_event(event_name: str, payload: dict[str, Any]):
     """Broadcast an RPC event notification to all connected WebSockets."""
     event = RPCEvent(event=event_name, data=payload)
     message_str = event.model_dump_json()
@@ -134,6 +144,7 @@ def route_rpc_request(req: RPCRequest) -> RPCResponse:
                     id=z.id,
                     label=z.label,
                     points=tuple(Point(p.x, p.y) for p in z.polygon_points),
+                    coordinate_space=z.coordinate_space,
                 )
                 for z in params.zones
             )
@@ -150,6 +161,7 @@ def route_rpc_request(req: RPCRequest) -> RPCResponse:
                 id="main",
                 label=params.zone_name,
                 points=tuple(Point(p.x, p.y) for p in params.polygon_points),
+                coordinate_space="normalized",
             )
             state.active_zones = (new_zone,)
             return RPCResponse(
@@ -205,9 +217,14 @@ async def get_zones():
 
 @app.get("/api/roi")
 async def get_roi():
-    """Backward-compatible: fetch the first zone's polygon as ROI."""
+    """Backward-compatible: fetch the first (active) zone's polygon as ROI."""
+    zone_name = (
+        state.active_zones[0].label
+        if state.active_zones
+        else state.config.roi.zone_name
+    )
     return {
-        "zone_name": state.config.roi.zone_name,
+        "zone_name": zone_name,
         "polygon_points": [{"x": p.x, "y": p.y} for p in state.active_roi_points],
     }
 
@@ -220,6 +237,7 @@ async def set_zones_rest(params: SetQueueZonesParams):
             id=z.id,
             label=z.label,
             points=tuple(Point(p.x, p.y) for p in z.polygon_points),
+            coordinate_space=z.coordinate_space,
         )
         for z in params.zones
     )
@@ -249,6 +267,7 @@ async def set_roi_rest(params: SetQueueZoneParams):
         id="main",
         label=params.zone_name,
         points=tuple(Point(p.x, p.y) for p in params.polygon_points),
+        coordinate_space="normalized",
     )
     state.active_zones = (new_zone,)
 
@@ -407,4 +426,4 @@ async def websocket_rpc_endpoint(websocket: WebSocket):
         print("WebSocket client disconnected.")
 
 
-__all__ = ["app", "state", "route_rpc_request", "get_vision_runtime"]
+__all__ = ["app", "get_vision_runtime", "route_rpc_request", "state"]

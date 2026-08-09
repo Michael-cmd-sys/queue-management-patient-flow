@@ -3,8 +3,9 @@ JSON-RPC 2.0 and Event Streaming Protocol Definitions.
 Strict typing and serialization models for frontend-backend contract safety.
 """
 
-from typing import Any, Dict, List, Optional, Union
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel, Field, model_validator
 
 
 class PointDTO(BaseModel):
@@ -18,9 +19,9 @@ class RPCRequest(BaseModel):
     """Standard JSON-RPC 2.0 Request Payload."""
 
     jsonrpc: str = Field(default="2.0", description="Protocol version")
-    id: Union[int, str] = Field(..., description="Request identifier")
+    id: int | str = Field(..., description="Request identifier")
     method: str = Field(..., description="RPC method name (e.g. 'set_queue_zones')")
-    params: Optional[Dict[str, Any]] = Field(
+    params: dict[str, Any] | None = Field(
         default=None, description="Procedure arguments"
     )
 
@@ -33,16 +34,16 @@ class RPCError(BaseModel):
         description="Error code (-32600 invalid, -32602 invalid params, -32000 internal error)",
     )
     message: str = Field(..., description="Human readable error message")
-    data: Optional[Any] = Field(default=None, description="Optional diagnostic details")
+    data: Any | None = Field(default=None, description="Optional diagnostic details")
 
 
 class RPCResponse(BaseModel):
     """Standard JSON-RPC 2.0 Response Payload."""
 
     jsonrpc: str = Field(default="2.0")
-    id: Optional[Union[int, str]] = None
-    result: Optional[Any] = None
-    error: Optional[RPCError] = None
+    id: int | str | None = None
+    result: Any | None = None
+    error: RPCError | None = None
 
 
 class RPCEvent(BaseModel):
@@ -50,34 +51,46 @@ class RPCEvent(BaseModel):
 
     jsonrpc: str = Field(default="2.0")
     event: str = Field(..., description="Event name (e.g. 'queue_metrics_update')")
-    data: Dict[str, Any] = Field(..., description="Event payload")
+    data: dict[str, Any] = Field(..., description="Event payload")
 
 
 class ZoneDTO(BaseModel):
     """A named queue zone definition for the set_queue_zones procedure."""
 
-    id: str = Field(..., description="Unique zone identifier")
+    id: str = Field(..., min_length=1, description="Unique zone identifier")
     label: str = Field(
         default="Main Queue Zone", description="Human-readable zone name"
     )
-    polygon_points: List[PointDTO] = Field(
+    polygon_points: list[PointDTO] = Field(
         ..., min_length=3, description="List of at least 3 polygon points"
+    )
+    coordinate_space: str = Field(
+        default="normalized",
+        description="Coordinate space of polygon_points: 'normalized' (0..1) or 'pixel'.",
     )
 
 
 class SetQueueZonesParams(BaseModel):
     """Parameters for 'set_queue_zones' procedure — accepts multiple named zones."""
 
-    zones: List[ZoneDTO] = Field(
+    zones: list[ZoneDTO] = Field(
         ..., min_length=1, description="List of at least 1 zone definition"
     )
+
+    @model_validator(mode="after")
+    def _enforce_unique_zone_ids(self) -> "SetQueueZonesParams":
+        ids = [z.id for z in self.zones]
+        if len(ids) != len(set(ids)):
+            dupes = sorted({i for i in ids if ids.count(i) > 1})
+            raise ValueError(f"Duplicate zone IDs in request: {dupes}")
+        return self
 
 
 class SetQueueZoneParams(BaseModel):
     """Backward-compatible single-zone parameters (deprecated; use SetQueueZonesParams)."""
 
     zone_name: str = Field(default="Main Queue Area")
-    polygon_points: List[PointDTO] = Field(
+    polygon_points: list[PointDTO] = Field(
         ..., min_length=3, description="List of at least 3 polygon points"
     )
 
@@ -90,7 +103,7 @@ class QueueMetricsPayload(BaseModel):
     in_queue_count: int
     out_of_queue_count: int
     total_active_tracks: int
-    active_queue_ids: List[int]
+    active_queue_ids: list[int]
     avg_dwell_time_sec: float
     estimated_wait_time_sec: float
     estimated_wait_time_min: float
